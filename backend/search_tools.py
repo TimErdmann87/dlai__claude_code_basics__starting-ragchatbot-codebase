@@ -129,6 +129,54 @@ class CourseSearchTool(Tool):
         
         return "\n\n".join(formatted)
 
+class CourseOutlineTool(Tool):
+    """Tool for retrieving a course's outline: title, link, and full lesson list"""
+
+    def __init__(self, vector_store: VectorStore):
+        self.store = vector_store
+        self.last_sources = []  # Track sources from last lookup
+
+    def get_tool_definition(self) -> Dict[str, Any]:
+        return {
+            "name": "get_course_outline",
+            "description": "Get the outline/structure of a specific course: its title, course link, and the complete list of lessons (lesson number and title for each). Use this for questions about course structure, syllabus, table of contents, or 'what lessons are in this course'.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "course_title": {
+                        "type": "string",
+                        "description": "Course title (partial matches work, e.g. 'MCP', 'Introduction')"
+                    }
+                },
+                "required": ["course_title"]
+            }
+        }
+
+    def execute(self, course_title: str) -> str:
+        outline = self.store.get_course_outline(course_title)
+        if outline is None:
+            return f"No course found matching '{course_title}'."
+
+        title = outline["title"]
+        link = outline.get("course_link")
+        lessons = outline.get("lessons", [])
+
+        header = f"Course: {title}"
+        header += f"\nCourse Link: {link}" if link else "\nCourse Link: not available"
+
+        if lessons:
+            lessons_block = "\n".join(
+                f"Lesson {lesson['lesson_number']}: {lesson['lesson_title']}"
+                for lesson in lessons
+            )
+        else:
+            lessons_block = "No lessons found for this course."
+
+        self.last_sources = [Source(text=title, link=link)]
+
+        return f"{header}\n\nLessons:\n{lessons_block}"
+
+
 class ToolManager:
     """Manages available tools for the AI"""
     
@@ -156,11 +204,11 @@ class ToolManager:
         return self.tools[tool_name].execute(**kwargs)
     
     def get_last_sources(self) -> list:
-        """Get sources from the last search operation"""
+        """Get sources from the last search operation, sorted alphabetically by label"""
         # Check all tools for last_sources attribute
         for tool in self.tools.values():
             if hasattr(tool, 'last_sources') and tool.last_sources:
-                return tool.last_sources
+                return sorted(tool.last_sources, key=lambda source: source.text.lower())
         return []
 
     def reset_sources(self):
