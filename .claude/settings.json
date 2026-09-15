@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"$(date '+%H:%M:%S') - Read tool used on: $(jq -r '.tool_input.file_path')\" >> ~/.claude-read.log"
+          }
+        ]
+      }
+    ]
+  }
+}
