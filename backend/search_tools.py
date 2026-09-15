@@ -1,6 +1,14 @@
 from typing import Dict, Any, Optional, Protocol
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from vector_store import VectorStore, SearchResults
+
+
+@dataclass
+class Source:
+    """A single source reference returned to the UI"""
+    text: str
+    link: Optional[str] = None
 
 
 class Tool(ABC):
@@ -89,23 +97,31 @@ class CourseSearchTool(Tool):
         """Format search results with course and lesson context"""
         formatted = []
         sources = []  # Track sources for the UI
-        
+        seen_sources = set()  # Dedup sources by (course, lesson)
+
         for doc, meta in zip(results.documents, results.metadata):
             course_title = meta.get('course_title', 'unknown')
             lesson_num = meta.get('lesson_number')
-            
+
             # Build context header
             header = f"[{course_title}"
             if lesson_num is not None:
                 header += f" - Lesson {lesson_num}"
             header += "]"
-            
-            # Track source for the UI
-            source = course_title
-            if lesson_num is not None:
-                source += f" - Lesson {lesson_num}"
-            sources.append(source)
-            
+
+            # Track source for the UI, resolving a link if available
+            # (skip if this course/lesson was already added as a source)
+            source_key = (course_title, lesson_num)
+            if source_key not in seen_sources:
+                seen_sources.add(source_key)
+                source_text = course_title
+                if lesson_num is not None:
+                    source_text += f" - Lesson {lesson_num}"
+                    link = self.store.get_lesson_link(course_title, lesson_num)
+                else:
+                    link = self.store.get_course_link(course_title)
+                sources.append(Source(text=source_text, link=link))
+
             formatted.append(f"{header}\n{doc}")
         
         # Store sources for retrieval

@@ -40,10 +40,15 @@ class QueryRequest(BaseModel):
     query: str
     session_id: Optional[str] = None
 
+class SourceItem(BaseModel):
+    """A single source reference with optional link"""
+    text: str
+    link: Optional[str] = None
+
 class QueryResponse(BaseModel):
     """Response model for course queries"""
     answer: str
-    sources: List[str]
+    sources: List[SourceItem]
     session_id: str
 
 class CourseStats(BaseModel):
@@ -67,7 +72,7 @@ async def query_documents(request: QueryRequest):
         
         return QueryResponse(
             answer=answer,
-            sources=sources,
+            sources=[SourceItem(text=s.text, link=s.link) for s in sources],
             session_id=session_id
         )
     except Exception as e:
