@@ -48,6 +48,27 @@ The key design point: retrieval is **agentic, not a fixed pipeline step**. `RAGS
 - `models.py` — Pydantic models: `Course`, `Lesson`, `CourseChunk`. `Course.title` is used as the unique ID throughout (Chroma document ID in `course_catalog`, filter key in `course_content`).
 - `config.py` — central `Config` dataclass (loaded from `.env` via `python-dotenv`): model name, embedding model, chunk size/overlap, max search results, max history, Chroma path.
 
+**RAG pipeline in detail:**
+
+*Ingestion (on startup, `app.py` → `RAGSystem.add_course_folder` → `add_course_document`):*
+1. `DocumentProcessor.process_course_document` parses the file into a `Course` (title/link/instructor) and per-lesson text bodies (see format below).
+2. Each lesson body is split into overlapping chunks by `chunk_text`: sentence-boundary splitting, packed up to `CHUNK_SIZE` (800 chars), with the tail `CHUNK_OVERLAP` (100 chars) of sentences repeated at the start of the next chunk so context isn't lost at chunk edges.
+3. The first chunk of each lesson is prefixed with `"Course {title} Lesson {n} content: ..."` so that chunk retains course/lesson identity even when embedded and retrieved in isolation.
+4. `VectorStore.add_course_metadata` embeds one document per course (title only) into the `course_catalog` collection, storing instructor/link/lesson list as metadata — this collection exists purely to resolve fuzzy course-name lookups later, not for content retrieval.
+5. `VectorStore.add_course_content` embeds every chunk into the `course_content` collection, with `course_title`/`lesson_number`/`chunk_index` as metadata for filtering.
+6. Both collections use the same embedding function: `sentence-transformers` model `all-MiniLM-L6-v2` (`EMBEDDING_MODEL` in `config.py`), run locally (no API calls for embeddings).
+7. Ingestion is idempotent by course title: `app.py` skips any course whose title is already in `course_catalog`.
+
+*Retrieval (per query, `RAGSystem.query` → `AIGenerator.generate_response`):*
+1. Claude receives the user question plus recent session history and the `search_course_content` tool definition; it decides whether the question needs course-specific lookup at all (general knowledge questions get answered without searching).
+2. If Claude calls the tool, `CourseSearchTool.execute` → `VectorStore.search`:
+   - If a `course_name` was passed, it's first resolved via a semantic query against `course_catalog` (top-1 match) to get the exact stored title — so the tool tolerates fuzzy/partial course names.
+   - A Chroma `where` filter is built from the resolved `course_title` and/or `lesson_number`.
+   - `course_content` is queried with the filter, returning up to `MAX_RESULTS` (5) chunks by embedding similarity.
+3. Results are formatted as `[Course Title - Lesson N]` headers followed by chunk text, and `CourseSearchTool` records them in `last_sources` (with lesson links resolved via `VectorStore.get_lesson_link`) for the frontend to display.
+4. Formatted results are appended to the conversation and sent back to Claude in a second API call *without* tools, so Claude cannot loop/chain further searches — at most one search round-trip per query.
+5. Claude synthesizes the final answer from the retrieved chunks; `RAGSystem` returns `(answer, sources)` and calls `ToolManager.reset_sources()` so sources don't leak into the next query.
+
 **Expected course document format** (see `docs/*.txt`), parsed line-by-line by `DocumentProcessor.process_course_document`:
 ```
 Course Title: <title>
