@@ -10,6 +10,8 @@ A Retrieval-Augmented Generation (RAG) system for answering questions about cour
 
 Package management is via `uv` (not pip/poetry). Windows users run these from Git Bash.
 
+Always use `uv run` to start the server or execute scripts — never invoke `python`/`python3` directly.
+
 ```bash
 uv sync                                     # install dependencies
 ```
