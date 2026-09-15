@@ -12,6 +12,13 @@ Anthropic" course) to maximize confidence of real content overlap.
 
 from unittest.mock import MagicMock
 
+import pytest
+
+# These load the embedding model and read the real Chroma store, and they only
+# pass once `./run.sh` (or app startup) has ingested docs/ into backend/chroma_db.
+# Skip them on a fast run with: uv run pytest -m "not slow"
+pytestmark = pytest.mark.slow
+
 
 class TestContentQueries:
     def test_content_query_returns_scripted_answer_with_real_resolvable_sources(
