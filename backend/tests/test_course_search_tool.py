@@ -2,9 +2,10 @@
 Objective 1: pure unit tests for CourseSearchTool and ToolManager.
 VectorStore is fully mocked -- no real Chroma, no network.
 """
+
 import pytest
 
-from search_tools import CourseSearchTool, CourseOutlineTool, ToolManager, Source, Tool
+from search_tools import CourseOutlineTool, CourseSearchTool, Source, Tool, ToolManager
 
 
 class TestCourseSearchToolFormatting:
@@ -25,8 +26,7 @@ class TestCourseSearchToolFormatting:
         result = tool.execute(query="test")
 
         assert result == (
-            "[Course A - Lesson 1]\ndoc1 text\n\n"
-            "[Course A - Lesson 2]\ndoc2 text"
+            "[Course A - Lesson 1]\ndoc1 text\n\n" "[Course A - Lesson 2]\ndoc2 text"
         )
         mock_vector_store.search.assert_called_once_with(
             query="test", course_name=None, lesson_number=None
@@ -49,8 +49,12 @@ class TestCourseSearchToolFormatting:
         tool.execute(query="test")
 
         assert len(tool.last_sources) == 2
-        assert tool.last_sources[0] == Source(text="X - Lesson 1", link="https://lesson-link")
-        assert tool.last_sources[1] == Source(text="X - Lesson 2", link="https://lesson-link")
+        assert tool.last_sources[0] == Source(
+            text="X - Lesson 1", link="https://lesson-link"
+        )
+        assert tool.last_sources[1] == Source(
+            text="X - Lesson 2", link="https://lesson-link"
+        )
         # dedup means the second chunk from lesson 1 must NOT trigger a second link lookup
         assert mock_vector_store.get_lesson_link.call_count == 2
 
@@ -87,7 +91,9 @@ class TestCourseSearchToolEmptyResultsMessage:
 
         assert result == "No relevant content found in course 'Foo'."
 
-    def test_empty_with_positive_lesson_number_only(self, mock_vector_store, make_results):
+    def test_empty_with_positive_lesson_number_only(
+        self, mock_vector_store, make_results
+    ):
         mock_vector_store.search.return_value = make_results()
         tool = CourseSearchTool(mock_vector_store)
 
@@ -113,8 +119,12 @@ class TestCourseSearchToolEmptyResultsMessage:
 
         assert result == "No relevant content found."
 
-    def test_error_returned_verbatim_without_formatting(self, mock_vector_store, make_results):
-        mock_vector_store.search.return_value = make_results(error="No course found matching 'Bogus'")
+    def test_error_returned_verbatim_without_formatting(
+        self, mock_vector_store, make_results
+    ):
+        mock_vector_store.search.return_value = make_results(
+            error="No course found matching 'Bogus'"
+        )
         tool = CourseSearchTool(mock_vector_store)
 
         result = tool.execute(query="q", course_name="Bogus")
@@ -142,6 +152,7 @@ class TestToolManager:
         class NamelessTool(Tool):
             def get_tool_definition(self):
                 return {"description": "no name field"}
+
             def execute(self, **kwargs):
                 return "irrelevant"
 
@@ -162,7 +173,10 @@ class TestToolManager:
         manager.register_tool(tool)
         mock_vector_store.search.return_value = make_results(
             documents=["a", "b"],
-            metadata=[{"course_title": "Zebra Course"}, {"course_title": "Alpha Course"}],
+            metadata=[
+                {"course_title": "Zebra Course"},
+                {"course_title": "Alpha Course"},
+            ],
         )
         mock_vector_store.get_course_link.return_value = None
         tool.execute(query="x")
@@ -171,7 +185,9 @@ class TestToolManager:
 
         assert [s.text for s in sources] == ["Alpha Course", "Zebra Course"]
 
-    def test_reset_sources_clears_all_registered_tools(self, mock_vector_store, make_results):
+    def test_reset_sources_clears_all_registered_tools(
+        self, mock_vector_store, make_results
+    ):
         tool = CourseSearchTool(mock_vector_store)
         manager = ToolManager()
         manager.register_tool(tool)
@@ -186,7 +202,9 @@ class TestToolManager:
 
         assert manager.get_last_sources() == []
 
-    def test_get_last_sources_only_surfaces_first_tool_with_sources(self, mock_vector_store):
+    def test_get_last_sources_only_surfaces_first_tool_with_sources(
+        self, mock_vector_store
+    ):
         """
         Documents existing behavior: get_last_sources returns only the first
         registered tool whose last_sources is non-empty -- it does not merge

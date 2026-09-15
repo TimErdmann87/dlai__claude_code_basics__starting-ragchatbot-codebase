@@ -17,8 +17,30 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
+    "black>=25.1.0",
+    "isort>=6.0.1",
 ]
 
 [tool.pytest.ini_options]
 pythonpath = ["backend"]
 testpaths = ["backend/tests"]
+
+[tool.black]
+line-length = 88
+target-version = ["py313"]
+
+[tool.isort]
+# Keep isort's output byte-identical to what black would produce.
+profile = "black"
+line_length = 88
+known_first_party = [
+    "ai_generator",
+    "app",
+    "config",
+    "document_processor",
+    "models",
+    "rag_system",
+    "search_tools",
+    "session_manager",
+    "vector_store",
+]

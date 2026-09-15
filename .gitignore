@@ -10,9 +10,13 @@ __pycache__/
 .Python
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
+
+# Node (Prettier is the only dev dependency; there is no build step)
+node_modules/
 
 # ChromaDB
 backend/chroma_db/

@@ -9,6 +9,7 @@ NOTE: query/course terms below are chosen because they are the course's own
 name/topic (e.g. "Computer Use" for the "Building Towards Computer Use with
 Anthropic" course) to maximize confidence of real content overlap.
 """
+
 from unittest.mock import MagicMock
 
 
@@ -16,14 +17,18 @@ class TestContentQueries:
     def test_content_query_returns_scripted_answer_with_real_resolvable_sources(
         self, rag_system, text_response, tool_use_response
     ):
-        initial = tool_use_response([
-            {
-                "name": "search_course_content",
-                "input": {"query": "computer use", "course_name": "Computer Use"},
-                "id": "toolu_1",
-            }
-        ])
-        final = text_response("Computer use lets Claude interact with a desktop environment.")
+        initial = tool_use_response(
+            [
+                {
+                    "name": "search_course_content",
+                    "input": {"query": "computer use", "course_name": "Computer Use"},
+                    "id": "toolu_1",
+                }
+            ]
+        )
+        final = text_response(
+            "Computer use lets Claude interact with a desktop environment."
+        )
         rag_system.ai_generator.client.messages.create.side_effect = [initial, final]
 
         answer, sources = rag_system.query("What is computer use in that course?")
@@ -36,17 +41,19 @@ class TestContentQueries:
     def test_lesson_zero_scoped_search_finds_real_content_not_the_bug_path(
         self, rag_system, text_response, tool_use_response
     ):
-        initial = tool_use_response([
-            {
-                "name": "search_course_content",
-                "input": {
-                    "query": "introduction",
-                    "course_name": "Computer Use",
-                    "lesson_number": 0,
-                },
-                "id": "toolu_1",
-            }
-        ])
+        initial = tool_use_response(
+            [
+                {
+                    "name": "search_course_content",
+                    "input": {
+                        "query": "introduction",
+                        "course_name": "Computer Use",
+                        "lesson_number": 0,
+                    },
+                    "id": "toolu_1",
+                }
+            ]
+        )
         final = text_response("Lesson 0 introduces the course.")
         rag_system.ai_generator.client.messages.create.side_effect = [initial, final]
 
@@ -56,7 +63,9 @@ class TestContentQueries:
         assert len(sources) > 0
         assert any(s.text.endswith("Lesson 0") for s in sources)
 
-    def test_nonexistent_course_name_degrades_gracefully_without_crashing(self, rag_system):
+    def test_nonexistent_course_name_degrades_gracefully_without_crashing(
+        self, rag_system
+    ):
         # Direct tool-manager call: exercises the real fuzzy _resolve_course_name
         # path against the real catalog without needing a scripted Anthropic turn.
         result = rag_system.tool_manager.execute_tool(
@@ -71,16 +80,22 @@ class TestContentQueries:
     def test_sources_reset_between_sequential_queries(
         self, rag_system, text_response, tool_use_response
     ):
-        initial = tool_use_response([
-            {
-                "name": "search_course_content",
-                "input": {"query": "computer use", "course_name": "Computer Use"},
-                "id": "toolu_1",
-            }
-        ])
+        initial = tool_use_response(
+            [
+                {
+                    "name": "search_course_content",
+                    "input": {"query": "computer use", "course_name": "Computer Use"},
+                    "id": "toolu_1",
+                }
+            ]
+        )
         final1 = text_response("first answer")
         final2 = text_response("second answer, no tool used")
-        rag_system.ai_generator.client.messages.create.side_effect = [initial, final1, final2]
+        rag_system.ai_generator.client.messages.create.side_effect = [
+            initial,
+            final1,
+            final2,
+        ]
 
         _, sources1 = rag_system.query("What is computer use?")
         assert len(sources1) > 0
@@ -106,7 +121,9 @@ class TestSessionHistory:
         assert "answer one" in history
         assert "second question" in history
 
-        second_call_kwargs = rag_system.ai_generator.client.messages.create.call_args_list[1].kwargs
+        second_call_kwargs = (
+            rag_system.ai_generator.client.messages.create.call_args_list[1].kwargs
+        )
         assert "Previous conversation:" in second_call_kwargs["system"]
         assert "first question" in second_call_kwargs["system"]
 

@@ -29,7 +29,23 @@ cd backend && uv run uvicorn app:app --reload --port 8000
 - Web UI: http://localhost:8000
 - API docs: http://localhost:8000/docs
 
-There is no test suite, linter, or build step in this repo.
+There is no build step in this repo (the frontend is served as static files).
+
+**Code quality / formatting** — black + isort for Python, Prettier for `frontend/*.{html,css,js}`:
+
+```bash
+./scripts/format.sh    # auto-format everything in place
+./scripts/check.sh     # verify formatting only, writes nothing (exits 1 if unformatted)
+./scripts/quality.sh   # full gate: check.sh + pytest
+```
+
+Run `./scripts/format.sh` after editing any file, and `./scripts/quality.sh` before committing.
+Formatter config: `[tool.black]`/`[tool.isort]` in `pyproject.toml`, `.prettierrc.json` for the
+frontend. Prettier is the only npm dependency and is installed automatically on first script run.
+
+Tests live in `backend/tests/` and run via `uv run pytest`. Note that 3 tests in
+`test_rag_system_content_queries.py` fail against the committed baseline — these are
+pre-existing diagnostic failures, not regressions.
 
 ## Architecture
 

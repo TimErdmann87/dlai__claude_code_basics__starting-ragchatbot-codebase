@@ -1,20 +1,21 @@
 """Shared fixtures for the backend diagnostic test suite."""
-from pathlib import Path
+
 from dataclasses import dataclass
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
-from vector_store import VectorStore, SearchResults
-from search_tools import ToolManager
 from ai_generator import AIGenerator
 from rag_system import RAGSystem
-
+from search_tools import ToolManager
+from vector_store import SearchResults, VectorStore
 
 # ---------------------------------------------------------------------------
 # Objective 1 helpers: CourseSearchTool / ToolManager unit tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def mock_vector_store():
@@ -25,6 +26,7 @@ def mock_vector_store():
 @pytest.fixture
 def make_results():
     """Factory for building SearchResults without boilerplate."""
+
     def _make(documents=None, metadata=None, distances=None, error=None):
         return SearchResults(
             documents=documents or [],
@@ -32,12 +34,14 @@ def make_results():
             distances=distances or [],
             error=error,
         )
+
     return _make
 
 
 # ---------------------------------------------------------------------------
 # Objective 2 helpers: AIGenerator unit tests (Anthropic client mocked)
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def ai_generator():
@@ -55,11 +59,13 @@ def mock_tool_manager():
 @pytest.fixture
 def text_response():
     """Build a fake Anthropic response whose content is a single text block."""
+
     def _make(text, stop_reason="end_turn"):
         return SimpleNamespace(
             stop_reason=stop_reason,
             content=[SimpleNamespace(type="text", text=text)],
         )
+
     return _make
 
 
@@ -69,6 +75,7 @@ def tool_use_response():
     Build a fake Anthropic response containing one or more tool_use blocks.
     tool_calls: list of {"name": str, "input": dict, "id": optional str}
     """
+
     def _make(tool_calls, stop_reason="tool_use"):
         blocks = [
             SimpleNamespace(
@@ -80,6 +87,7 @@ def tool_use_response():
             for i, call in enumerate(tool_calls)
         ]
         return SimpleNamespace(stop_reason=stop_reason, content=blocks)
+
     return _make
 
 
@@ -99,6 +107,7 @@ class _TestConfig:
     './chroma_db' is relative and assumes cwd == backend/, which is NOT
     true when pytest runs from the repo root per testpaths=['backend/tests']).
     """
+
     ANTHROPIC_API_KEY: str = "test-key-not-used"
     ANTHROPIC_MODEL: str = "claude-sonnet-5"
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"

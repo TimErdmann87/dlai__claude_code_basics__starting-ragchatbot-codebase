@@ -3,6 +3,7 @@ Objective 2: AIGenerator unit tests. The Anthropic client is mocked;
 tool_manager is a MagicMock(spec=ToolManager) so call args can be asserted
 exactly. No network calls, no real tools, no real VectorStore.
 """
+
 from types import SimpleNamespace
 
 
@@ -10,13 +11,15 @@ class TestToolUseFlow:
     def test_tool_use_triggers_execute_tool_with_exact_kwargs(
         self, ai_generator, mock_tool_manager, text_response, tool_use_response
     ):
-        initial = tool_use_response([
-            {
-                "name": "search_course_content",
-                "input": {"query": "prompt caching", "course_name": "Computer Use"},
-                "id": "toolu_1",
-            }
-        ])
+        initial = tool_use_response(
+            [
+                {
+                    "name": "search_course_content",
+                    "input": {"query": "prompt caching", "course_name": "Computer Use"},
+                    "id": "toolu_1",
+                }
+            ]
+        )
         final = text_response("Here is the answer.")
         ai_generator.client.messages.create.side_effect = [initial, final]
         mock_tool_manager.execute_tool.return_value = "tool result text"
@@ -35,53 +38,87 @@ class TestToolUseFlow:
     def test_follow_up_call_appends_assistant_and_tool_result_messages(
         self, ai_generator, mock_tool_manager, text_response, tool_use_response
     ):
-        initial = tool_use_response([
-            {"name": "search_course_content", "input": {"query": "x"}, "id": "toolu_42"}
-        ])
+        initial = tool_use_response(
+            [
+                {
+                    "name": "search_course_content",
+                    "input": {"query": "x"},
+                    "id": "toolu_42",
+                }
+            ]
+        )
         final = text_response("answer")
         ai_generator.client.messages.create.side_effect = [initial, final]
         mock_tool_manager.execute_tool.return_value = "the tool output"
 
         ai_generator.generate_response(
-            query="q", tools=[{"name": "search_course_content"}], tool_manager=mock_tool_manager
+            query="q",
+            tools=[{"name": "search_course_content"}],
+            tool_manager=mock_tool_manager,
         )
 
         assert ai_generator.client.messages.create.call_count == 2
-        second_call_kwargs = ai_generator.client.messages.create.call_args_list[1].kwargs
+        second_call_kwargs = ai_generator.client.messages.create.call_args_list[
+            1
+        ].kwargs
         messages = second_call_kwargs["messages"]
 
         assert messages[0] == {"role": "user", "content": "q"}
         assert messages[1] == {"role": "assistant", "content": initial.content}
         assert messages[2]["role"] == "user"
         assert messages[2]["content"] == [
-            {"type": "tool_result", "tool_use_id": "toolu_42", "content": "the tool output"}
+            {
+                "type": "tool_result",
+                "tool_use_id": "toolu_42",
+                "content": "the tool output",
+            }
         ]
 
     def test_follow_up_call_excludes_tools_and_tool_choice(
         self, ai_generator, mock_tool_manager, text_response, tool_use_response
     ):
-        initial = tool_use_response([
-            {"name": "search_course_content", "input": {"query": "x"}, "id": "toolu_1"}
-        ])
+        initial = tool_use_response(
+            [
+                {
+                    "name": "search_course_content",
+                    "input": {"query": "x"},
+                    "id": "toolu_1",
+                }
+            ]
+        )
         final = text_response("answer")
         ai_generator.client.messages.create.side_effect = [initial, final]
         mock_tool_manager.execute_tool.return_value = "result"
 
         ai_generator.generate_response(
-            query="q", tools=[{"name": "search_course_content"}], tool_manager=mock_tool_manager
+            query="q",
+            tools=[{"name": "search_course_content"}],
+            tool_manager=mock_tool_manager,
         )
 
-        second_call_kwargs = ai_generator.client.messages.create.call_args_list[1].kwargs
+        second_call_kwargs = ai_generator.client.messages.create.call_args_list[
+            1
+        ].kwargs
         assert "tools" not in second_call_kwargs
         assert "tool_choice" not in second_call_kwargs
 
     def test_multiple_parallel_tool_use_blocks_all_executed(
         self, ai_generator, mock_tool_manager, text_response, tool_use_response
     ):
-        initial = tool_use_response([
-            {"name": "search_course_content", "input": {"query": "a"}, "id": "toolu_1"},
-            {"name": "get_course_outline", "input": {"course_title": "MCP"}, "id": "toolu_2"},
-        ])
+        initial = tool_use_response(
+            [
+                {
+                    "name": "search_course_content",
+                    "input": {"query": "a"},
+                    "id": "toolu_1",
+                },
+                {
+                    "name": "get_course_outline",
+                    "input": {"course_title": "MCP"},
+                    "id": "toolu_2",
+                },
+            ]
+        )
         final = text_response("combined answer")
         ai_generator.client.messages.create.side_effect = [initial, final]
         mock_tool_manager.execute_tool.side_effect = ["result A", "result B"]
@@ -91,7 +128,9 @@ class TestToolUseFlow:
         )
 
         assert mock_tool_manager.execute_tool.call_count == 2
-        second_call_kwargs = ai_generator.client.messages.create.call_args_list[1].kwargs
+        second_call_kwargs = ai_generator.client.messages.create.call_args_list[
+            1
+        ].kwargs
         tool_result_message = second_call_kwargs["messages"][2]
         assert tool_result_message["content"] == [
             {"type": "tool_result", "tool_use_id": "toolu_1", "content": "result A"},
@@ -100,7 +139,9 @@ class TestToolUseFlow:
 
 
 class TestNoToolUseFlow:
-    def test_no_tools_passed_omits_tools_and_tool_choice_keys(self, ai_generator, text_response):
+    def test_no_tools_passed_omits_tools_and_tool_choice_keys(
+        self, ai_generator, text_response
+    ):
         ai_generator.client.messages.create.return_value = text_response("plain answer")
 
         result = ai_generator.generate_response(query="hello")
@@ -139,7 +180,9 @@ class TestExtractTextWithRetry:
         assert result == "recovered text"
         assert ai_generator.client.messages.create.call_count == 2
 
-    def test_returns_empty_string_without_looping_if_retry_is_also_textless(self, ai_generator):
+    def test_returns_empty_string_without_looping_if_retry_is_also_textless(
+        self, ai_generator
+    ):
         empty1 = SimpleNamespace(stop_reason="end_turn", content=[])
         empty2 = SimpleNamespace(stop_reason="end_turn", content=[])
         ai_generator.client.messages.create.side_effect = [empty1, empty2]
@@ -152,7 +195,9 @@ class TestExtractTextWithRetry:
 
 
 class TestSystemPromptAndParams:
-    def test_conversation_history_is_appended_to_system_prompt(self, ai_generator, text_response):
+    def test_conversation_history_is_appended_to_system_prompt(
+        self, ai_generator, text_response
+    ):
         ai_generator.client.messages.create.return_value = text_response("ok")
 
         ai_generator.generate_response(
@@ -163,7 +208,9 @@ class TestSystemPromptAndParams:
         assert "Previous conversation:" in call_kwargs["system"]
         assert "User: hi" in call_kwargs["system"]
 
-    def test_no_conversation_history_uses_bare_system_prompt(self, ai_generator, text_response):
+    def test_no_conversation_history_uses_bare_system_prompt(
+        self, ai_generator, text_response
+    ):
         ai_generator.client.messages.create.return_value = text_response("ok")
 
         ai_generator.generate_response(query="q")
