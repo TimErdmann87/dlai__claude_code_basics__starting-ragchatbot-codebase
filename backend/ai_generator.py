@@ -36,7 +36,8 @@ Provide only the direct answer to what was asked.
         # Pre-build base API parameters
         self.base_params = {
             "model": self.model,
-            "max_tokens": 800
+            "max_tokens": 800,
+            "thinking": {"type": "disabled"}
         }
     
     def generate_response(self, query: str,
@@ -83,7 +84,7 @@ Provide only the direct answer to what was asked.
             return self._handle_tool_execution(response, api_params, tool_manager)
         
         # Return direct response
-        return response.content[0].text
+        return self._extract_text_with_retry(response, api_params)
     
     def _handle_tool_execution(self, initial_response, base_params: Dict[str, Any], tool_manager):
         """
@@ -131,4 +132,19 @@ Provide only the direct answer to what was asked.
         
         # Get final response
         final_response = self.client.messages.create(**final_params)
-        return final_response.content[0].text
+        return self._extract_text_with_retry(final_response, final_params)
+
+    def _extract_text(self, response) -> str:
+        """Extract the text content from a response, skipping non-text blocks (e.g. thinking blocks)"""
+        for block in response.content:
+            if block.type == "text":
+                return block.text
+        return ""
+
+    def _extract_text_with_retry(self, response, api_params: Dict[str, Any]) -> str:
+        """Extract text from a response, retrying the call once if the model ended the turn with no text (can happen after a thinking block)"""
+        text = self._extract_text(response)
+        if not text:
+            response = self.client.messages.create(**api_params)
+            text = self._extract_text(response)
+        return text
