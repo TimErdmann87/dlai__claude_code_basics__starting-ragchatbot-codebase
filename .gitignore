@@ -26,6 +26,9 @@ uploads/
 *.swp
 *.swo
 
+# Playwright MCP output (screenshots, snapshots, console logs)
+.playwright-mcp/
+
 # OS
 .DS_Store
 Thumbs.db
