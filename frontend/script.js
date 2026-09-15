@@ -5,7 +5,7 @@ const API_URL = "/api";
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton, themeToggle;
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
@@ -16,7 +16,9 @@ document.addEventListener("DOMContentLoaded", () => {
   totalCourses = document.getElementById("totalCourses");
   courseTitles = document.getElementById("courseTitles");
   newChatButton = document.getElementById("newChatButton");
+  themeToggle = document.getElementById("themeToggle");
 
+  initTheme();
   setupEventListeners();
   createNewSession();
   loadCourseStats();
@@ -33,6 +35,9 @@ function setupEventListeners() {
   // New chat
   newChatButton.addEventListener("click", createNewSession);
 
+  // Theme toggle (native <button> handles Enter/Space for keyboard users)
+  themeToggle.addEventListener("click", toggleTheme);
+
   // Suggested questions
   document.querySelectorAll(".suggested-item").forEach((button) => {
     button.addEventListener("click", (e) => {
@@ -41,6 +46,55 @@ function setupEventListeners() {
       sendMessage();
     });
   });
+}
+
+// Theme Functions
+// The theme itself is applied by an inline script in index.html (before first paint);
+// these functions keep the toggle button's state in sync and handle switching.
+function initTheme() {
+  const current = document.documentElement.getAttribute("data-theme") || "dark";
+  applyTheme(current, false);
+
+  // Follow the OS setting as long as the user hasn't made an explicit choice
+  const systemPrefersLight = window.matchMedia("(prefers-color-scheme: light)");
+  systemPrefersLight.addEventListener("change", (e) => {
+    if (!getStoredTheme()) {
+      applyTheme(e.matches ? "light" : "dark", false);
+    }
+  });
+}
+
+function toggleTheme() {
+  const current =
+    document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  applyTheme(current === "light" ? "dark" : "light", true);
+}
+
+function applyTheme(theme, persist) {
+  document.documentElement.setAttribute("data-theme", theme);
+
+  if (persist) {
+    try {
+      localStorage.setItem("theme", theme);
+    } catch (error) {
+      console.error("Could not save theme preference:", error);
+    }
+  }
+
+  if (themeToggle) {
+    const label = theme === "light" ? "Switch to dark theme" : "Switch to light theme";
+    themeToggle.setAttribute("aria-checked", theme === "light" ? "true" : "false");
+    themeToggle.setAttribute("aria-label", label);
+    themeToggle.setAttribute("title", label);
+  }
+}
+
+function getStoredTheme() {
+  try {
+    return localStorage.getItem("theme");
+  } catch (error) {
+    return null;
+  }
 }
 
 // Chat Functions
